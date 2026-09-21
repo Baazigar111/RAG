@@ -1,24 +1,51 @@
+import os
+import logging
+from dotenv import load_dotenv
+
+load_dotenv()
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Depends, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
-from app.database.db import SessionLocal
+from app.database.db import SessionLocal, init_db
 from app.pipelines.trace_scrubber import TraceScrubber
 from app.parsers.postmortem_parser import PostMortemParser
 from app.pipelines.search import HybridSearchEngine
 from app.pipelines.synthesizer import RemediationSynthesizer
 from app.database.models import LogEmbeddingModel
 
-app = FastAPI(title="LogIntel RAG Backend")
+logger = logging.getLogger("uvicorn")
 
-# Enable CORS for Next.js frontend integration
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Auto-initialize database tables and pgvector extension on startup
+    try:
+        init_db()
+        logger.info("Database tables and pgvector extension initialized successfully.")
+    except Exception as e:
+        logger.warning(f"Database initialization deferred or encountered error: {e}")
+    yield
+
+app = FastAPI(title="LogIntel RAG Backend", lifespan=lifespan)
+
+# Enable dynamic CORS for frontend integration
+raw_origins = os.getenv("CORS_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000")
+allowed_origins = [o.strip() for o in raw_origins.split(",") if o.strip()]
+if "*" in allowed_origins:
+    allowed_origins = ["*"]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.get("/health")
+def health_check():
+    return {"status": "healthy", "service": "logintel-rag-backend"}
 
 def get_db():
     db = SessionLocal()

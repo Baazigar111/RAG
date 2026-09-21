@@ -1,0 +1,26 @@
+# Python virtualenv and cache
+venv/
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+
+# Git and IDE
+.git/
+.gitignore
+.agents/
+.gemini/
+.idea/
+.vscode/
+
+# Environment files
+.env
+.env.local
+
+# Frontend folder (not needed in backend Docker image)
+frontend/
+node_modules/
+
+# Logs and misc
+*.log
